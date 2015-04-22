@@ -1,0 +1,25 @@
+#Stat133 Project 2
+
+#Part 1
+
+processLine = function(x)
+{
+  # x is a string  that corresponds to one line from the data file
+  # returns  a character matrix with 10 columns
+  txt = readLines("offline.final.trace.txt")
+tmp = lapply(txt, processLine)
+offline = as.data.frame(do.call("rbind", tmp))
+names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
+                    "orientation", "mac", "signal", "channel", "type")
+}
+
+
+#Part 2
+
+cleanData = function(data, keepMacs = c("mm:mm:mm:ss:ss:ss", etc)) {
+  # data is the output from the above processing, e.g., offline
+  # keepMacs is a character vector of the 6 MAC addresses
+  return(dataframe)
+}
+
+offline2 =cleanData(offline)
