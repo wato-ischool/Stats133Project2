@@ -69,7 +69,45 @@ names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
 cleanData = function(data, keepMacs = c("mm:mm:mm:ss:ss:ss", etc)) {
   # data is the output from the above processing, e.g., offline
   # keepMacs is a character vector of the 6 MAC addresses
+  
+  # The spec says, "Convert data that should be numeric."
+  # see http://stackoverflow.com/questions/3418128/how-to-convert-a-factor-to-an-integer-numeric-without-a-loss-of-information
+  data$time = as.numeric(levels(data$time))[data$time]
+  data$posX = as.numeric(levels(data$posX))[data$posX]
+  data$posY = as.numeric(levels(data$posY))[data$posY]
+  data$posZ = as.numeric(levels(data$posZ))[data$posZ]
+  data$orientation = as.numeric(levels(data$orientation))[data$orientation]
+  data$signal = as.numeric(levels(data$signal))[data$signal]
+  
+  # Drop any irrelevant variables, i.e., variables that have the same values for all records or
+  # where the same information is captured in another variable.
+  # 1. Drop scanMac because length(offline$scanMac[as.character.factor(offline$scanMac) != "00:02:2D:21:0F:33"]) returns 0.
+  # 2. Drop "posZ" because nrow(offline[offline$posZ != 0.0, ]) returns 0.
+  # 3. Drop "posX" and "posY" because they can be computed from "orientation".
+  # drop columns method from http://stackoverflow.com/questions/4605206/drop-columns-r-data-frame/21719511#21719511
+  data[ , c("scanMac", "posX", "posY", "posZ")] = list(NULL)
+  
+  # Round the values for orientation to the nearest 45 degrees, but keep the original values too. 
+  data$roundedOrientation = round(data$orientation / 45.0, digits = 0) * 45
+  
+  # Drop all records that correspond to adhoc devices, and not the access points.
+  # There will still be about a dozen MAC addresses in the data.
+  # Use exploratory data analysis to ﬁgure out which are the 6 MAC addresses on the ﬂoor.
+  # According to the data documentation, these 6 include 5 Linksys/Cisco and one Lancom L-54g routers.
+  # You can look up the MAC addresses at http://coffer.com/mac find/ to ﬁnd the vendors.
+  # This may prove helpful in narrowing down the MAC addresses to keep.
+  # Prefix 0014BF is from Cisco-Linksys, LLC (example: 00:14:bf:b1:97:8a).
+  # Prefix 00A057 is from Lancom.
+  
+  
   return(dataframe)
 }
+
+
+
+
+
+
+
 
 offline2 = cleanData(offline)
