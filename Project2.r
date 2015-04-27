@@ -29,7 +29,6 @@ txt = txt[!grepl("^# ", txt)]
 # returns  a character matrix with 10 columns
 processLine = function(x) {
   
-  
   # gsub can be used to capture groups.
   # See http://stackoverflow.com/questions/952275/regex-group-capture-in-r-with-multiple-capture-groups/953496#953496.
 
@@ -99,20 +98,37 @@ processLine = function(x) {
   posY = gsub("^.+?,(.+?),.*", "\\1", pos)
   posZ = gsub("^.+?,.+?,(.+)", "\\1", pos)
   
-  
   # 1. ignore everything before "degree=" appears in the string
-  # 2. capture the text between "degree=" and ";"
-  #    Use the "+" instead of "*" because we must capture 1 or more characters.
-  #    Use the "?" so it is a "lazy" regular expression,
-  #    meaning that it reads up to the first matching ";"
-  #    instead of reading to the last matching ";"
-  # 3. ignore everything after the ";"
-  orientation = gsub(".*degree=(.+?);.*", "\\1", x)
+  # 2. capture the text after "degree=" that is part of a number
+  #    [[:digit:]] is a character class that represents numbers between 0 and 9
+  #    the number format is always a) one or more digits, b) a period, c) one or more digits
+  orientation = gsub(".*degree=([[:digit:]]+\\.[[:digit:]]*).*", "\\1", x)
   
   # 1. ignore everything before "degree=[DEGREE_VALUE];" appears in the string
   # 2. capture the text between "degree=[DEGREE_VALUE];" and the end of the string
-  #    Use the "+" instead of "*" because we must capture 1 or more characters.
-  macsStr = gsub(".*degree=.*?;(.+)", "\\1", x)
+  macsStr = gsub(".*degree=.[[:digit:]]+\\.[[:digit:]]*;?(.+)", "\\1", x)
+  
+  # Example mac:
+  # 00:14:bf:b1:97:8a=-38,2437000000,3;00:14:bf:b1:97:90=-56,2427000000,3;
+  # regular expression test string to determine mac is valid
+  macTestRE = paste("^", "(?:",
+                    "[[:alnum:]][[:alnum:]]:[[:alnum:]][[:alnum:]]:",
+                    "[[:alnum:]][[:alnum:]]:[[:alnum:]][[:alnum:]]:",
+                    "[[:alnum:]][[:alnum:]]:[[:alnum:]][[:alnum:]]",
+                    "=", "-?[[:digit:]]+,", "[[:digit:]]+,",
+                    "[[:digit:]]+", ";",
+                    ")*",
+                    "[[:alnum:]][[:alnum:]]:[[:alnum:]][[:alnum:]]:",
+                    "[[:alnum:]][[:alnum:]]:[[:alnum:]][[:alnum:]]:",
+                    "[[:alnum:]][[:alnum:]]:[[:alnum:]][[:alnum:]]",
+                    "=", "-?[[:digit:]]+,", "[[:digit:]]+,",
+                    "[[:digit:]]+",
+                    "$",
+                    sep = "")
+  
+  if (!grepl(macTestRE, macsStr)) {
+    macsStr = NA
+  }
   
   # macStr returns something like ~11 MAC addresses, delimited by semicolons (";"):
   # 00:14:bf:b1:97:8a=-38,2437000000,3;00:14:bf:b1:97:90=-56,2427000000,3;
@@ -121,15 +137,29 @@ processLine = function(x) {
   # 00:0f:a3:39:dd:cd=-75,2412000000,3;00:0f:a3:39:e0:4b=-78,2462000000,3;
   # 00:0f:a3:39:e2:10=-87,2437000000,3;02:64:fb:68:52:e6=-88,2447000000,1;
   # 02:00:42:55:31:00=-84,2457000000,1"
-  macs = strsplit(macsStr, ";")[[1]]
+  
+  if (!is.na(macsStr)) {
+    macs = strsplit(macsStr, ";")[[1]]
+  } else {
+    macs = NA
+  }
   
   # example from http://stackoverflow.com/questions/20730537/add-new-row-to-matrix-one-by-one
   return(t(sapply(macs,
                   function(wholeMac) {
-                    mac = gsub("(.+?)=.*", "\\1", wholeMac)
-                    signal = gsub(".*?=(.+?),.*", "\\1", wholeMac)
-                    channel = gsub(".*?=.*?,(.+?),.*", "\\1", wholeMac)
-                    type = gsub(".*?=.*?,.*?,(.+)", "\\1", wholeMac)
+                    # make sure this is not a malformed MAC
+                    if (!is.na(wholeMac)) {
+                      mac = gsub("(.+?)=.*", "\\1", wholeMac)
+                      signal = gsub(".*?=(.+?),.*", "\\1", wholeMac)
+                      channel = gsub(".*?=.*?,(.+?),.*", "\\1", wholeMac)
+                      type = gsub(".*?=.*?,.*?,(.+)", "\\1", wholeMac)
+                    } else {
+                      mac = NA
+                      signal = NA
+                      channel = NA
+                      type = NA
+                    }
+
                     c(time, scanMac,
                       posX, posY, posZ,
                       orientation,
@@ -141,13 +171,62 @@ tmp = lapply(txt, processLine)
 offline = as.data.frame(do.call("rbind", tmp))
 names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
                    "orientation", "mac", "signal", "channel", "type")
+row.names(offline) = NULL       # get rid of the extraneous row names at the beginning of the data frame
 
 
 ################# Part 2  #################
 
-cleanData = function(data, keepMacs = c("mm:mm:mm:ss:ss:ss", etc)) {
+cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90",
+                                        "00:0f:a3:39:e1:c0", "00:14:bf:b1:97:8d",
+                                        "00:14:bf:b1:97:81", "00:14:bf:3b:c7:c6",
+                                        "00:0f:a3:39:dd:cd", "00:0f:a3:39:e0:4b",
+                                        "00:0f:a3:39:e2:10", "00:04:0e:5c:23:fc",
+                                        "00:30:bd:f8:7f:c5", "00:e0:63:82:8b:a9")) {
+  
+  # remove malformed data
+  data = data[!is.na(data$mac), ]
+  
   # data is the output from the above processing, e.g., offline
-  # keepMacs is a character vector of the 6 MAC addresses
+  # keepMacs is a character vector of the MAC addresses that correspond to real vendors
+  
+  # Drop all records that correspond to adhoc devices, and not the access points.
+  # There will still be about a dozen MAC addresses in the data.
+  # Use exploratory data analysis to ﬁgure out which are the 6 MAC addresses on the ﬂoor.
+  # According to the data documentation, these 6 include 5 Linksys/Cisco and one Lancom L-54g routers.
+  # You can look up the MAC addresses at http://coffer.com/mac_find/ to ﬁnd the vendors.
+  # This may prove helpful in narrowing down the MAC addresses to keep.
+  
+  # unique(offline$mac)
+  # [1] <NA>              00:14:bf:b1:97:90 00:14:bf:b1:97:81 00:14:bf:3b:c7:c6 00:0f:a3:39:e1:c0 00:0f:a3:39:dd:cd 02:00:42:55:31:00
+  # [8] 00:14:bf:b1:97:8a 02:64:fb:68:52:e6 00:14:bf:b1:97:8d 00:0f:a3:39:e2:10 00:0f:a3:39:e0:4b 00:04:0e:5c:23:fc 00:30:bd:f8:7f:c5
+  # [15] 00:e0:63:82:8b:a9 02:37:fd:3b:54:b5 02:2e:58:22:f1:ac 02:42:1c:4e:b5:c0 02:0a:3d:06:94:88 02:5c:e0:50:49:de 02:4f:99:43:30:cd
+  # [22] 02:b7:00:bb:a9:35
+  
+  # Find the vendors by entering the prefixes into http://coffer.com/mac_find/.
+  # 1)  <NA> is invalid.
+  # 2)  00:14:bf:b1:97:90 has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
+  # 3)  00:14:bf:b1:97:81 has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
+  # 4)  00:14:bf:3b:c7:c6 has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
+  # 5)  00:0f:a3:39:e1:c0 has the prefix 00:0f:a3 and is from Alpha Networks Inc.
+  # 6)  00:0f:a3:39:dd:cd has the prefix 00:0f:a3 and is from Alpha Networks Inc.
+  # 7)  02:00:42:55:31:00 has the prefix 02:00:42 and is from nowhere.
+  # 8)  00:14:bf:b1:97:8a has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
+  # 9)  02:64:fb:68:52:e6 has the prefix 02:64:fb and is from nowhere.
+  # 10) 00:14:bf:b1:97:8d has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
+  # 11) 00:0f:a3:39:e2:10 has the prefix 00:0f:a3 and is from Alpha Networks Inc.
+  # 12) 00:0f:a3:39:e0:4b has the prefix 00:0f:a3 and is from Alpha Networks Inc.
+  # 13) 00:04:0e:5c:23:fc has the prefix 00:04:0e and is from AVM GmbH.
+  # 14) 00:30:bd:f8:7f:c5 has the prefix 00:30:bd and is from BELKIN COMPONENTS.
+  # 15) 00:e0:63:82:8b:a9 has the prefix 00:e0:63 and is from cabletron - yago systems, inc.
+  # 17) 02:37:fd:3b:54:b5 has the prefix 02:37:fd and is from nowhere.
+  # 18) 02:2e:58:22:f1:ac has the prefix 02:2e:58 and is from nowhere.
+  # 19) 02:42:1c:4e:b5:c0 has the prefix 02:42:1c and is from nowhere.
+  # 20) 02:0a:3d:06:94:88 has the prefix 02:0a:3d and is from nowhere.
+  # 21) 02:5c:e0:50:49:de has the prefix 02:5c:e0 and is from nowhere.
+  # 22) 02:4f:99:43:30:cd has the prefix 02:4f:99 and is from nowhere.
+  # 23) 02:b7:00:bb:a9:35 has the prefix 02:b7:00 and is from nowhere.
+  
+  data = data[data$mac %in% keepMacs, ]
   
   # The spec says, "Convert data that should be numeric."
   # see http://stackoverflow.com/questions/3418128/how-to-convert-a-factor-to-an-integer-numeric-without-a-loss-of-information
@@ -161,7 +240,11 @@ cleanData = function(data, keepMacs = c("mm:mm:mm:ss:ss:ss", etc)) {
   # Drop any irrelevant variables, i.e., variables that have the same values for all records or
   # where the same information is captured in another variable.
   # 1. Drop scanMac because length(offline$scanMac[as.character.factor(offline$scanMac) != "00:02:2D:21:0F:33"]) returns 0.
+  #    Also, > unique(offline$scanMac)
+  #         [1] 00:02:2D:21:0F:33
   # 2. Drop "posZ" because nrow(offline[offline$posZ != 0.0, ]) returns 0.
+  #    Also, > unique(offline$posZ)
+  #         [1] 0.0
   # 3. Drop "posX" and "posY" because they can be computed from "orientation".
   # drop columns method from http://stackoverflow.com/questions/4605206/drop-columns-r-data-frame/21719511#21719511
   data[ , c("scanMac", "posX", "posY", "posZ")] = list(NULL)
@@ -169,25 +252,7 @@ cleanData = function(data, keepMacs = c("mm:mm:mm:ss:ss:ss", etc)) {
   # Round the values for orientation to the nearest 45 degrees, but keep the original values too. 
   data$roundedOrientation = round(data$orientation / 45.0, digits = 0) * 45
   
-  # Drop all records that correspond to adhoc devices, and not the access points.
-  # There will still be about a dozen MAC addresses in the data.
-  # Use exploratory data analysis to ﬁgure out which are the 6 MAC addresses on the ﬂoor.
-  # According to the data documentation, these 6 include 5 Linksys/Cisco and one Lancom L-54g routers.
-  # You can look up the MAC addresses at http://coffer.com/mac find/ to ﬁnd the vendors.
-  # This may prove helpful in narrowing down the MAC addresses to keep.
-
-  # Prefix 0014BF is from Cisco-Linksys, LLC (example: 00:14:bf:b1:97:8a).
-  # Prefix 00A057 is from Lancom.
-  
-  
-  return(dataframe)
+  return(data)
 }
-
-
-
-
-
-
-
 
 offline2 = cleanData(offline)
