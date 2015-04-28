@@ -171,8 +171,6 @@ tmp = lapply(txt, processLine)
 offline = as.data.frame(do.call("rbind", tmp))
 names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
                    "orientation", "mac", "signal", "channel", "type")
-row.names(offline) = NULL       # get rid of the extraneous row names at the beginning of the data frame
-
 
 ################# Part 2  #################
 
@@ -182,6 +180,9 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
                                         "00:0f:a3:39:dd:cd", "00:0f:a3:39:e0:4b",
                                         "00:0f:a3:39:e2:10", "00:04:0e:5c:23:fc",
                                         "00:30:bd:f8:7f:c5", "00:e0:63:82:8b:a9")) {
+  
+  # get rid of the extraneous row names at the beginning of the data frame
+  row.names(data) = NULL
   
   # remove malformed data
   data = data[!is.na(data$mac), ]
@@ -203,6 +204,7 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # [22] 02:b7:00:bb:a9:35
   
   # Find the vendors by entering the prefixes into http://coffer.com/mac_find/.
+  # Keep all MACs that have vendors. Throw away MACs that do not appear in the "Mac Find" database.
   # 1)  <NA> is invalid.
   # 2)  00:14:bf:b1:97:90 has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
   # 3)  00:14:bf:b1:97:81 has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
@@ -245,9 +247,8 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # 2. Drop "posZ" because nrow(offline[offline$posZ != 0.0, ]) returns 0.
   #    Also, > unique(offline$posZ)
   #         [1] 0.0
-  # 3. Drop "posX" and "posY" because they can be computed from "orientation".
   # drop columns method from http://stackoverflow.com/questions/4605206/drop-columns-r-data-frame/21719511#21719511
-  data[ , c("scanMac", "posX", "posY", "posZ")] = list(NULL)
+  data[ , c("scanMac", "posZ")] = list(NULL)
   
   # Round the values for orientation to the nearest 45 degrees, but keep the original values too. 
   data$roundedOrientation = round(data$orientation / 45.0, digits = 0) * 45
