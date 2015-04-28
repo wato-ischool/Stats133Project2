@@ -247,8 +247,9 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # 2. Drop "posZ" because nrow(offline[offline$posZ != 0.0, ]) returns 0.
   #    Also, > unique(offline$posZ)
   #         [1] 0.0
+  # 3. Drop "type" which can be computed from "mac" (the mac's type is 3 for access point and 1 for device in adhoc mode = 1)
   # drop columns method from http://stackoverflow.com/questions/4605206/drop-columns-r-data-frame/21719511#21719511
-  data[ , c("scanMac", "posZ")] = list(NULL)
+  data[ , c("scanMac", "posZ", "type")] = list(NULL)
   
   # Round the values for orientation to the nearest 45 degrees, but keep the original values too. 
   data$roundedOrientation = round(data$orientation / 45.0, digits = 0) * 45
