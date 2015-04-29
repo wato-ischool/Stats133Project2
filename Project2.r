@@ -11,7 +11,7 @@ OFFLINE_FILE_NAME = "offline.final.trace.txt"
 # replace the variable's value with the absolute path to the online.final.trace.txt file
 ONLINE_FILE_NAME = "online.final.trace.txt"
 
-################# Part 1  #################
+################# Part 1 Task 1  #################
 
 # txt is a character vector containing all the files' lines
 txt = readLines(con = OFFLINE_FILE_NAME)
@@ -172,14 +172,11 @@ offline = as.data.frame(do.call("rbind", tmp))
 names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
                    "orientation", "mac", "signal", "channel", "type")
 
-################# Part 2  #################
+################# Part 1, Task 2  #################
 
 cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90",
-                                        "00:0f:a3:39:e1:c0", "00:14:bf:b1:97:8d",
-                                        "00:14:bf:b1:97:81", "00:14:bf:3b:c7:c6",
-                                        "00:0f:a3:39:dd:cd", "00:0f:a3:39:e0:4b",
-                                        "00:0f:a3:39:e2:10", "00:04:0e:5c:23:fc",
-                                        "00:30:bd:f8:7f:c5", "00:e0:63:82:8b:a9")) {
+                                        "00:14:bf:b1:97:8d", "00:14:bf:b1:97:81",
+                                        "00:14:bf:3b:c7:c6", "00:04:0e:5c:23:fc")) {
   
   # get rid of the extraneous row names at the beginning of the data frame
   row.names(data) = NULL
@@ -204,7 +201,10 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # [22] 02:b7:00:bb:a9:35
   
   # Find the vendors by entering the prefixes into http://coffer.com/mac_find/.
-  # Keep all MACs that have vendors. Throw away MACs that do not appear in the "Mac Find" database.
+  # Keep all MACs that are from the vendors Cisco or Lancom.
+  # Note that from
+  # http://www.lancom-systems.de/produkte/wireless-lan/indoor-wlan-access-points/lancom-l-54g-wireless/l-54g-wireless-ueberblick/
+  # we know that AVM GmbH is from Lancom 54G because it says at the bottom "[Copyright symbol] 2015 LANCOM Systems GmbH".
   # 1)  <NA> is invalid.
   # 2)  00:14:bf:b1:97:90 has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
   # 3)  00:14:bf:b1:97:81 has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
@@ -217,7 +217,7 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # 10) 00:14:bf:b1:97:8d has the prefix 00:14:bf and is from Cisco-Linksys, LLC.
   # 11) 00:0f:a3:39:e2:10 has the prefix 00:0f:a3 and is from Alpha Networks Inc.
   # 12) 00:0f:a3:39:e0:4b has the prefix 00:0f:a3 and is from Alpha Networks Inc.
-  # 13) 00:04:0e:5c:23:fc has the prefix 00:04:0e and is from AVM GmbH.
+  # 13) 00:04:0e:5c:23:fc has the prefix 00:04:0e and is from AVM GmbH (which is from Lancom).
   # 14) 00:30:bd:f8:7f:c5 has the prefix 00:30:bd and is from BELKIN COMPONENTS.
   # 15) 00:e0:63:82:8b:a9 has the prefix 00:e0:63 and is from cabletron - yago systems, inc.
   # 17) 02:37:fd:3b:54:b5 has the prefix 02:37:fd and is from nowhere.
@@ -254,7 +254,49 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # Round the values for orientation to the nearest 45 degrees, but keep the original values too. 
   data$roundedOrientation = round(data$orientation / 45.0, digits = 0) * 45
   
+  # get rid of the extraneous row names at the beginning of the data frame
+  row.names(data) = NULL
+  
   return(data)
 }
 
 offline2 = cleanData(offline)
+row.names(offline2) = NULL
+
+################# Part 3  #################
+
+# Given that we are computing distances between vectors of 6 signal strengths,
+# it may be helpful to organize the data in a diﬀerent structure.
+# Speciﬁcally, rather than a data frame with one column of signal strengths from all access points,
+# let's organize the data so that we have 6 columns of signal strengths,
+# i.e., one for each of the access points.
+# The new data frame will not need to keep MAC address for the access points.
+# It will have variables S1, S2, S3, S4, S5, S6,
+# which correspond to the signal strengths for each of the 6 access points.
+# Consequently, the number of rows in this data frame will be reduced by a factor of 6.
+
+combineSignals = function(data) {
+  
+  # make an index for every sixth row starting at 1, 2, 3, 4, 5, and 6
+  start1By6 = seq(1, nrow(data), by = 6)
+  start2By6 = seq(2, nrow(data), by = 6)
+  start3By6 = seq(3, nrow(data), by = 6)
+  start4By6 = seq(4, nrow(data), by = 6)
+  start5By6 = seq(5, nrow(data), by = 6)
+  start6By6 = seq(6, nrow(data), by = 6)
+  
+  # keep only every sixth row
+  newdf = data[start1By6, ]
+  
+  newdf$S1 = data[start1By6, ]$signal
+  newdf$S2 = data[start2By6, ]$signal
+  newdf$S3 = data[start3By6, ]$signal
+  newdf$S4 = data[start4By6, ]$signal
+  newdf$S5 = data[start5By6, ]$signal
+  newdf$S6 = data[start6By6, ]$signal
+
+  return(newdf)
+  
+}
+
+offline3 = combineSignals(offline2)
