@@ -2,7 +2,6 @@
 
 ################# Global variables  #################
 
-
 # can be downloaded from https://d1b10bmlvqabco.cloudfront.net/attach/i53463e2voe2yj/gxr526imlnz7np/i8vhafgocleb/offline.final.trace.txt
 # replace the variable's value with the absolute path to the offline.final.trace.txt file
 OFFLINE_FILE_NAME = "offline.final.trace.txt"
@@ -90,7 +89,7 @@ processLine = function(x) {
   # 3. ignore everything after the ";"
   pos = gsub(".*pos=(.+?);.*", "\\1", x)
   
-  # pos returns something like: "pos=0.0,1.0,2.0"
+  # pos returns something like: "0.0,1.0,2.0"
   # posX is the first number: 0.0
   # posY is the second number: 1.0
   # posZ is the third number: 2.0
@@ -106,7 +105,10 @@ processLine = function(x) {
   
   # 1. ignore everything before "degree=[DEGREE_VALUE];" appears in the string
   # 2. capture the text between "degree=[DEGREE_VALUE];" and the end of the string
-  macsStr = gsub(".*degree=.[[:digit:]]+\\.[[:digit:]]*;?(.+)", "\\1", x)
+  macsStr = gsub(".*degree=[[:digit:]]+\\.[[:digit:]]*(.+)", "\\1", x)
+  
+  # get rid of any starting semicolon
+  macsStr = gsub("^;", "", macsStr)
   
   # Example mac:
   # 00:14:bf:b1:97:8a=-38,2437000000,3;00:14:bf:b1:97:90=-56,2427000000,3;
@@ -176,13 +178,16 @@ names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
 
 cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90",
                                         "00:14:bf:b1:97:8d", "00:14:bf:b1:97:81",
-                                        "00:14:bf:3b:c7:c6", "00:04:0e:5c:23:fc")) {
+                                        "00:14:bf:3b:c7:c6", "00:0f:a3:39:e1:c0")) {
   
   # get rid of the extraneous row names at the beginning of the data frame
   row.names(data) = NULL
   
   # remove malformed data
   data = data[!is.na(data$mac), ]
+  
+  # remove adhoc devices
+  data = data[data$type == "3", ]
   
   # data is the output from the above processing, e.g., offline
   # keepMacs is a character vector of the MAC addresses that correspond to real vendors
@@ -228,6 +233,25 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # 22) 02:4f:99:43:30:cd has the prefix 02:4f:99 and is from nowhere.
   # 23) 02:b7:00:bb:a9:35 has the prefix 02:b7:00 and is from nowhere.
   
+  # table(offline[offline$type == "3", ]$mac)
+  # 00:04:0e:5c:23:fc 00:0f:a3:39:dd:cd 00:0f:a3:39:e0:4b 00:0f:a3:39:e1:c0 00:0f:a3:39:e2:10 00:14:bf:3b:c7:c6 00:14:bf:b1:97:81 
+  # 418            145619             43508            145862             19162            126529            120339 
+  # 00:14:bf:b1:97:8a 00:14:bf:b1:97:8d 00:14:bf:b1:97:90 00:30:bd:f8:7f:c5 00:e0:63:82:8b:a9 02:00:42:55:31:00 02:0a:3d:06:94:88 
+  # 132962            121325            122315               301               103                 0                 0 
+  # 02:2e:58:22:f1:ac 02:37:fd:3b:54:b5 02:42:1c:4e:b5:c0 02:4f:99:43:30:cd 02:5c:e0:50:49:de 02:64:fb:68:52:e6 02:b7:00:bb:a9:35 
+  # 0                 0                 0                 0                 0                 0                 0
+  
+  # Eliminate the MACs with very few readings compared to the rest of the data.
+  # Eliminate 00:04:0e:5c:23:fc (418 readings), 00:0f:a3:39:e0:4b (43508 readings), 00:0f:a3:39:e2:10 (19162 readings),
+  # 00:30:bd:f8:7f:c5 (301 readings), 00:e0:63:82:8b:a9 (103 readings), and everything with zeroes.
+  
+  # Keep 00:0f:a3:39:dd:cd, 00:0f:a3:39:e1:c0, 00:14:bf:3b:c7:c6, 00:14:bf:b1:97:81,
+  # 00:14:bf:b1:97:8a, 00:14:bf:b1:97:8d, and 00:14:bf:b1:97:90.
+  
+  # We need to have six MAC addresses, so we keep the five MACs from Cisco
+  # and randomly choose one of the Alpha Networks to eliminate.
+  # Let's eliminate 00:0f:a3:39:dd:cd and keep 00:0f:a3:39:e1:c0.
+  
   data = data[data$mac %in% keepMacs, ]
   
   # The spec says, "Convert data that should be numeric."
@@ -247,12 +271,18 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   # 2. Drop "posZ" because nrow(offline[offline$posZ != 0.0, ]) returns 0.
   #    Also, > unique(offline$posZ)
   #         [1] 0.0
-  # 3. Drop "type" which can be computed from "mac" (the mac's type is 3 for access point and 1 for device in adhoc mode = 1)
+  # 3. Drop "channel" because "channel" can be determined from the MAC address
+  # 4. Drop "type" which can be computed from "mac" (the mac's type is 3 for access point and 1 for device in adhoc mode = 1)
   # drop columns method from http://stackoverflow.com/questions/4605206/drop-columns-r-data-frame/21719511#21719511
-  data[ , c("scanMac", "posZ", "type")] = list(NULL)
+  data[ , c("scanMac", "posZ", "channel", "type")] = list(NULL)
   
   # Round the values for orientation to the nearest 45 degrees, but keep the original values too. 
   data$roundedOrientation = round(data$orientation / 45.0, digits = 0) * 45
+  
+  # The spec says that "Signal strengths were recorded at 8 orientations in 45 degree increments (i.e., 0, 45, 90, and so on)."
+  # The eight orientations are: 0, 45, 90, 135, 180, 225, 270, 335.
+  # Therefore, set all orientations that are 360 to 0.
+  data$roundedOrientation[data$roundedOrientation == 360] = 0
   
   # get rid of the extraneous row names at the beginning of the data frame
   row.names(data) = NULL
