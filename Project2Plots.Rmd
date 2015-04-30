@@ -1,0 +1,44 @@
+---
+title: "Project 2 Plots"
+author: "Kaela Shiigi"
+date: "April 29, 2015"
+output: html_document
+---
+
+#Project 2 Plots
+
+#Exploratory data analysis, finding the relevant Mac addresses
+
+
+
+```{r}
+expdata= table(offline[offline$type == "3", ]$mac)
+expdataf= as.data.frame(expdata)
+expdataf2=expdataf[expdataf$Freq != 0, ]
+expdataf3=expdataf2[expdataf2$Freq > 100000, ]
+
+
+as.numeric(expdataf$Freq)
+as.numeric(expdataf2$Freq)
+as.numeric(expdataf3$Freq)
+```
+
+```{r, echo=FALSE}
+barplot(expdataf$Freq, names.arg= expdataf$Var1, cex.names=.5, col = "slateblue1", 
+        main = "Frequency for All Mac Addresses", ylab = "number of occurences", 
+        xlab = "Mac Addresses", axes=TRUE, axisnames=TRUE)
+
+barplot(expdataf2$Freq, names.arg= expdataf2$Var1, cex.names=.5, col = "slateblue2", 
+        main = "Frequency for Mac Addresses Greater than Zero", 
+        ylab = "number of occurences", xlab = "Mac Addresses", 
+        axes=TRUE, axisnames=TRUE)
+
+barplot(expdataf3$Freq, names.arg= expdataf3$Var1, cex.names=.75, col = "slateblue3", 
+        main = "Frequency for Potential Mac Addresses Greater than 100,000", 
+        ylab = "number of occurences", xlab = "Mac Addresses", 
+        axes=TRUE, axisnames=TRUE)
+
+
+```
+
+
