@@ -14,6 +14,7 @@ ONLINE_FILE_NAME = "online.final.trace.txt"
 
 # txt is a character vector containing all the files' lines
 txt = readLines(con = OFFLINE_FILE_NAME)
+txt2 = readLines(con = ONLINE_FILE_NAME)
 
 # from the spec: "drop any lines that do not have information in them (e.g., the first three lines)
 # subset by logical (boolean) vector:
@@ -23,6 +24,7 @@ txt = readLines(con = OFFLINE_FILE_NAME)
 #        [1] FALSE  TRUE  TRUE  FALSE
 #    source: http://www.regular-expressions.info/rlanguage.html
 txt = txt[!grepl("^# ", txt)]
+txt2 = txt2[!grepl("^# ", txt2)]
 
 # x is a string that corresponds to one line from the data file
 # returns  a character matrix with 10 columns
@@ -169,11 +171,6 @@ processLine = function(x) {
                   })))
 }
 
-tmp = lapply(txt, processLine)
-offline = as.data.frame(do.call("rbind", tmp))
-names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
-                   "orientation", "mac", "signal", "channel", "type")
-
 ################# Part 1, Task 2  #################
 
 cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90",
@@ -290,9 +287,6 @@ cleanData = function(data, keepMacs = c("00:14:bf:b1:97:8a", "00:14:bf:b1:97:90"
   return(data)
 }
 
-offline2 = cleanData(offline)
-row.names(offline2) = NULL
-
 ################# Part 3  #################
 
 # Given that we are computing distances between vectors of 6 signal strengths,
@@ -306,6 +300,10 @@ row.names(offline2) = NULL
 # Consequently, the number of rows in this data frame will be reduced by a factor of 6.
 
 combineSignals = function(data) {
+  
+  # remove everything that doesn't fit
+  relevantIndices = floor(nrow(data) / 6) * 6
+  data = data[1:relevantIndices, ]
   
   # make an index for every sixth row starting at 1, 2, 3, 4, 5, and 6
   start1By6 = seq(1, nrow(data), by = 6)
@@ -329,4 +327,34 @@ combineSignals = function(data) {
   
 }
 
-offline3 = combineSignals(offline2)
+# incomingSignal is a dataframe containing S1, S2, S3, S4, S5, and S6
+# trainingData is a dataframe containing S1, S2, S3, S4, S5, and S6
+findNearestNeighborAndPredXY = function(incomingSignal, trainingData, k) {
+  distances = sqrt((incomingSignal$S1 - trainingData$S1)^2 + (incomingSignal$S2 - trainingData$S2)^2
+                   + (incomingSignal$S3 - trainingData$S3)^2 + (incomingSignal$S4 - trainingData$S4)^2
+                   + (incomingSignal$S5 - trainingData$S5)^2 + (incomingSignal$S6 - trainingData$S6)^2)
+  orderedDistances = order(distances)
+  orderedData = trainingData[orderedDistances[1:k], c("posX", "posY")]
+  x = mean(orderedData$posX)
+  y = mean(orderedData$posY)
+  return(data.frame(x, y))
+}
+
+# Use Euclidean distance to measure how far from the truth the prediction is.
+calculateErrors = function(actual, predicted) {
+  return(sqrt((actual$posX - predicted$x)^2 + (actual$posY - predicted$y)^2))
+}
+
+offline = structureData(txt)
+online = structureData(txt2)
+
+# do the nearest neighbor computations and the cross validation
+# the for loop takes about 1-3 hours to run
+k = 20
+averageErrors = vector(length = k)
+for (i in 1:k) {
+  predictions = do.call(rbind, by(online, seq_len(nrow(online)), function(row) findNearestNeighborAndPredXY(row, offline, i)))
+  totalErrors = calculateErrors(online, predictions)
+  averageError = mean(totalErrors)
+  averageErrors[i] = averageError
+}
