@@ -358,3 +358,8 @@ for (i in 1:k) {
   averageError = mean(totalErrors)
   averageErrors[i] = averageError
 }
+
+# which.min() returns the argument with the lowest error.
+# That is, it returns the k with the lowest error and acts like argmin.
+lowestErrorK = which.min(k)
+minimumError = min(k)
