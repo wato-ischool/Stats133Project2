@@ -19,7 +19,6 @@ gsub takes the agruments of a regular expression, replacement, and strings then 
   
 
 ```{r, echo=FALSE}
-setwd("~/Desktop/Project2Statistics133")
 load("project2.RData")
 
 plot(x= offline2$posX, y= offline2$posY, type="p")
@@ -42,7 +41,7 @@ First we listed out all Mac addresses and noticed that there were many zeroes.
 
 ```{r, echo=FALSE}
 
-expdata= table(offline2[offline2$type == "3", ]$mac)
+expdata= table(offline2$mac)
 expdataf= as.data.frame(expdata)
 as.numeric(expdataf$Freq)
 
@@ -91,7 +90,7 @@ For part 3, we made combineSignals to combine the data by coordinates because ea
 Lastly, we calculated errors using the euclidian distance again. Here we did the nearest neighbor computations and the cross validation and came up with the average errors for each k value.
 
 ```{r, echo=FALSE}       
-
+library(plotrix)
 plot(x = seq(1:20), y= c(8.984657, 8.050310, 7.678957, 7.481312, 7.345998, 7.236572, 
                                     7.172336, 7.127412, 7.103869, 7.086165, 7.082385, 7.072182, 
                                     7.060496, 7.057262, 7.045027, 7.022970, 7.021125, 7.019217,
