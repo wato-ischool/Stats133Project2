@@ -345,8 +345,20 @@ calculateErrors = function(actual, predicted) {
   return(sqrt((actual$posX - predicted$x)^2 + (actual$posY - predicted$y)^2))
 }
 
-offline = structureData(txt)
-online = structureData(txt2)
+structureData = function(txt) {
+  tmp = lapply(txt, processLine)
+  offline = as.data.frame(do.call("rbind", tmp))
+  names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
+                     "orientation", "mac", "signal", "channel", "type")
+  offline2 = cleanData(offline)
+  return(offline2)
+}
+
+offline2 = structureData(txt)
+online2 = structureData(txt2)
+
+online = combineSignals(online2)
+offline = combineSignals(offline2)
 
 # do the nearest neighbor computations and the cross validation
 # the for loop takes about 1-3 hours to run
@@ -359,7 +371,13 @@ for (i in 1:k) {
   averageErrors[i] = averageError
 }
 
+# averageErrors
+# > 8.984657 8.050310 7.678957 7.481312 7.345998 7.236572 7.172336 7.127412 7.103869
+# 7.086165 7.082385 7.072182 7.060496 7.057262 7.045027
+# [16] 7.022970 7.021125 7.019217 7.013011 7.018817
+
 # which.min() returns the argument with the lowest error.
 # That is, it returns the k with the lowest error and acts like argmin.
-lowestErrorK = which.min(k)
-minimumError = min(k)
+# k = 19
+lowestErrorK = which.min(averageErrors)
+minimumError = min(averageErrors)
