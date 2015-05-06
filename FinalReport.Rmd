@@ -1,0 +1,112 @@
+---
+title: "Project 2 Plots"
+author: "Group 17"
+date: "April 29, 2015"
+output: html_document
+---
+
+Project 2 Report
+
+Exploratory data analysis, finding the relevant Mac addresses
+
+Part 1 Task 1 
+
+First, we dropped the first three lines without any information using subsetting by a boolean vector and grepl to remove anything following a "#"
+
+Next, we created the processline function which will process the data and create a character matrix with 10 colums from a line of the data file. This function consisted of using regular expressions, mainly gsub, for parsing the data. 
+
+gsub takes the agruments of a regular expression, replacement, and strings then replaces the original argument with the replacement argument. Sometimes, ".*" is insufficient to capture a group you want because it is too greedy. To make the regular expression "lazy" (or not "greedy"), add a question mark (?). To parse the data, we ignored everything before "t=" appears in the string, captured the text between "t=" and ";", and ignored everything after the ";". We did the same for scanmac, pos, and degree as well. We split pos into the x, y, and z components. This graph shows only the x and y components since z is zero for all observations. 
+  
+
+```{r, echo=FALSE}
+load("project2.RData")
+
+plot(x= offline2$posX, y= offline2$posY, type="p")
+
+
+```
+
+macTestRE is essential for determining if the extracted mac is valid. The extracted mac is sometimes invalid when it doesn't exist in the data. 
+ 
+
+Part 1 Task 2 
+
+First we deleted row names that are NULL and removed malformed data and ad hoc devices.
+
+We used exploratory data analysis to figure out which devices to keep from the remaining dozen or so MAC addresses in the data. According to the data documentation, these 6 include 5 Linksys/Cisco and one Lancom L-54g routers.
+ 
+First, we found the vendors by entering the prefixes into http://coffer.com/mac_find/ and kept all MACs that are from the vendors Cisco or Lancom.
+ 
+First we listed out all Mac addresses and noticed that there were many zeroes.
+
+```{r, echo=FALSE}
+
+expdata= table(offline2[offline2$type == "3", ]$mac)
+expdataf= as.data.frame(expdata)
+as.numeric(expdataf$Freq)
+
+barplot(expdataf$Freq, names.arg= expdataf$Var1, cex.names=.25, col = "slateblue1", 
+        main = "Frequency for All Mac Addresses", ylab = "number of occurences", 
+        xlab = "Mac Addresses", axes=TRUE, axisnames=TRUE)
+```
+  
+Next we removed the zeroes because they are on different floors.
+
+```{r, echo=FALSE}
+expdataf2=expdataf[expdataf$Freq != 0, ]
+as.numeric(expdataf2$Freq)
+
+barplot(expdataf2$Freq, names.arg= expdataf2$Var1, cex.names=.5, col = "slateblue2", 
+        main = "Frequency for Mac Addresses Greater than Zero", 
+        ylab = "number of occurences", xlab = "Mac Addresses", 
+        axes=TRUE, axisnames=TRUE)
+```  
+ 
+Finally, sorted Mac addresses by frequency and took all greater than 100,000. Randomly selected one of the two red non Linksys addresses for our final group of 6 addresses. 
+
+```{r, echo=FALSE}       
+expdataf3=expdataf2[expdataf2$Freq > 100000, ]
+as.numeric(expdataf3$Freq)
+barplot(expdataf3$Freq, names.arg= expdataf3$Var1, cex.names=.75, col = c("red", "red", "slateblue3", "slateblue3", "slateblue3", "slateblue3", "slateblue3"), 
+        main = "Frequency for Potential Mac Addresses Greater than 100,000", 
+        ylab = "number of occurences", xlab = "Mac Addresses", 
+        axes=TRUE, axisnames=TRUE)
+
+
+```
+ 
+After choosing the routers, we converted time, pos, orientation, and signal to numeric. Then we dropped any irrelevant variables, i.e., variables that have the same values for all records or where the same information is captured in another variable.
+1. Drop scanMac because length(offline$scanMac[as.character.factor(offline$scanMac) != "00:02:2D:21:0F:33"]) returns 0.
+2. Drop "posZ" because nrow(offline[offline$posZ != 0.0, ]) returns 0.
+3. Drop "channel" because "channel" can be determined from the MAC address
+4. Drop "type" which can be computed from "mac" (the mac's type is 3 for access point and 1 for device in adhoc mode = 1)
+  
+Finally we rounded the values for orientation to the nearest 45 degrees, but kept the original values too and got rid of the extraneous row names at the beginning of the data frame.
+
+Part 3
+
+For part 3, we made combineSignals to combine the data by coordinates because each 6 have the same x y coordinates based on how the data was cleaned. First we removed data that didn't fit and made an index for every 6th row which we kept. Next we found the nearest neighbor by using euclidian distance equation provided in the documentation with the groups from the combined coordinates. 
+
+Lastly, we calculated errors using the euclidian distance again. Here we did the nearest neighbor computations and the cross validation and came up with the average errors for each k value.
+
+```{r, echo=FALSE}       
+
+plot(x = seq(1:20), y= c(8.984657, 8.050310, 7.678957, 7.481312, 7.345998, 7.236572, 
+                                    7.172336, 7.127412, 7.103869, 7.086165, 7.082385, 7.072182, 
+                                    7.060496, 7.057262, 7.045027, 7.022970, 7.021125, 7.019217,
+                                    7.013011, 7.018817), type="l",
+         main= "Average Errors", xlab= "k value", ylab="average error", lwd = 3, ylim = c(5,10))
+
+
+axis.break(2, 4.9, style = "zigzag")
+points(x= seq(1:20), y=c(8.984657, 8.050310, 7.678957, 7.481312, 7.345998, 7.236572, 
+                                    7.172336, 7.127412, 7.103869, 7.086165, 7.082385, 7.072182, 
+                                    7.060496, 7.057262, 7.045027, 7.022970, 7.021125, 7.019217,
+                                    7.013011, 7.018817), lwd = 3)
+abline(v=19, col= "grey", lwd=5)
+text(x = 17, y = 9, labels= "Minimum Error Value")
+
+
+```
+
+To determine the lowest k, we ran which.min() on the vector of average errors for each k which returned k=19 as the lowest error value.
