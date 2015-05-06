@@ -359,12 +359,14 @@ tmp = lapply(txt, processLine)
 offline2 = as.data.frame(do.call("rbind", tmp))
 names(offline2) = c("time", "scanMac", "posX", "posY", "posZ",
                    "orientation", "mac", "signal", "channel", "type")
+offline2b = cleanData(offline2)
+
 
 offline3 = structureData(txt)
 online3 = structureData(txt2)
 
-online = combineSignals(online2)
-offline = combineSignals(offline2)
+online = combineSignals(online3)
+offline = combineSignals(offline3)
 
 # do the nearest neighbor computations and the cross validation
 # the for loop takes about 1-3 hours to run
