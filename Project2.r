@@ -357,7 +357,7 @@ structureData = function(txt) {
 # for the graphs
 tmp = lapply(txt, processLine)
 offline2 = as.data.frame(do.call("rbind", tmp))
-names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
+names(offline2) = c("time", "scanMac", "posX", "posY", "posZ",
                    "orientation", "mac", "signal", "channel", "type")
 
 offline3 = structureData(txt)
