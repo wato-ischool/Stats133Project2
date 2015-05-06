@@ -19,6 +19,7 @@ gsub takes the agruments of a regular expression, replacement, and strings then 
   
 
 ```{r, echo=FALSE}
+setwd("~/Desktop/Project2Statistics133")
 load("project2.RData")
 
 plot(x= offline2$posX, y= offline2$posY, type="p")

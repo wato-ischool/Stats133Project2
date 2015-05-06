@@ -354,8 +354,14 @@ structureData = function(txt) {
   return(offline2)
 }
 
-offline2 = structureData(txt)
-online2 = structureData(txt2)
+# for the graphs
+tmp = lapply(txt, processLine)
+offline2 = as.data.frame(do.call("rbind", tmp))
+names(offline) = c("time", "scanMac", "posX", "posY", "posZ",
+                   "orientation", "mac", "signal", "channel", "type")
+
+offline3 = structureData(txt)
+online3 = structureData(txt2)
 
 online = combineSignals(online2)
 offline = combineSignals(offline2)
