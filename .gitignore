@@ -1,2 +1,4 @@
 *.rda
 *.RData
+FinalReport_files/figure-html/*.png
+
